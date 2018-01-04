@@ -10,10 +10,15 @@ import time
 from mxnet.gluon.data.vision import MNIST
 import boto3
 import gzip,struct
+import os
 
 
 logging.basicConfig(level=logging.DEBUG)
 
+def yahoo():
+    return('yoohoo!')
+def yahoo1():
+    return('yoohoo!')
 # ------------------------------------------------------------ #
 # Training methods                                             #
 # ------------------------------------------------------------ #
@@ -23,6 +28,18 @@ def train(channel_input_dirs, hyperparameters, hosts, num_gpus, **kwargs):
     # SageMaker passes num_cpus, num_gpus and other args we can use to tailor training to
     # the current container environment, but here we just use simple cpu context.
     ctx = mx.gpu() if num_gpus > 0 else mx.cpu()
+    print()
+    print()
+    print()
+    print()
+    print('**********************************************************************')
+    print(channel_input_dirs)
+    print(os.listdir(channel_input_dirs['training']))
+    print('**********************************************************************')
+    print()
+    print()
+    print()
+    print()
 
     # retrieve the hyperparameters we set in notebook (with some defaults)
     batch_size = hyperparameters.get('batch_size', 100)
@@ -30,15 +47,21 @@ def train(channel_input_dirs, hyperparameters, hosts, num_gpus, **kwargs):
     learning_rate = hyperparameters.get('learning_rate', 0.1)
     momentum = hyperparameters.get('momentum', 0.9)
     log_interval = hyperparameters.get('log_interval', 100)
-    num_dims = hyperparameter.get('num_dims')
-    num_output = hyperparameter.get('num_outputs', 2)
+    num_dims = hyperparameters.get('num_dims')
+    num_output = hyperparameters.get('num_outputs', 2)
     
 
     # load training and validation data
-    (train_data_iter, test_data_iter) = load_data(filenames)
-
+    training_dir = channel_input_dirs['training']
+    train_data, test_data = load_data(training_dir)
+    train_data_iter = get_train_data(train_data,batch_size)
+    test_data_iter = get_test_data(test_data,batch_size)
+    
+    print(train_data[0].shape, train_data[0].shape, test_data[0].shape, test_data[0].shape)
     # define the network
-    net = define_network()
+    net = define_network(num_dims, num_output)
+    print(net.collect_params())
+
 
     # Collect all parameters from net and its children, then initialize them.
     net.initialize(mx.init.Xavier(magnitude=2.24), ctx=ctx)
@@ -57,9 +80,7 @@ def train(channel_input_dirs, hyperparameters, hosts, num_gpus, **kwargs):
 
     for epoch in range(epochs):
         # reset data iterator and metric at begining of epoch.
-        metric.reset()
-        btic = time.time()
-        for i, (data, label) in enumerate(train_data):
+        for i, (data, label) in enumerate(train_data_iter):
             # Copy data to ctx if necessary
             data = data.as_in_context(ctx)
             label = label.as_in_context(ctx)
@@ -71,22 +92,11 @@ def train(channel_input_dirs, hyperparameters, hosts, num_gpus, **kwargs):
                 L.backward()
             # take a gradient step with batch_size equal to data.shape[0]
             trainer.step(data.shape[0])
-            # update metric at last.
-            metric.update([label], [output])
 
-            if i % log_interval == 0 and i > 0:
-                name, acc = metric.get()
-                print('[Epoch %d Batch %d] Training: %s=%f, %f samples/s' %
-                      (epoch, i, name, acc, batch_size / (time.time() - btic)))
-
-            btic = time.time()
-
-        name, acc = metric.get()
-        print('[Epoch %d] Training: %s=%f' % (epoch, name, acc))
-
-        name, val_acc = evaluate_accuracy(net, test_data_iter, ctx)
-        print('[Epoch %d] Validation: %s=%f' % (epoch, name, val_acc))
-
+        test_accuracy = evaluate_accuracy(net, test_data_iter, ctx)
+        train_accuracy = evaluate_accuracy(net, train_data_iter, ctx)
+        print("Epoch %s, Train_acc %s, Test_acc %s" %
+              (epoch, train_accuracy, test_accuracy))    
     return net
 
 
@@ -96,17 +106,19 @@ def save(net, model_dir):
     y.save('%s/model.json' % model_dir)
     net.collect_params().save('%s/model.params' % model_dir)
 
-def load_data(data_files):
-    train_data = np.load(data_files['train_data']).astype(np.float32)
-    train_label = np.load(data_files['train_label']).astype(np.float32)
-    val_data = np.load(data_files['val_data']).astype(np.float32)
-    val_label = np.load(data_files['val_label']).astype(np.float32)
-    return (train_data, train_label), (val_data, val_label)
+def load_data(location):
+    train_data = np.load(location+'/train/train_data.npy').astype(np.float32)
+    train_label = np.load(location+'/train/train_label.npy').astype(np.float32)
+
+    test_data = np.load(location+'/test/val_data.npy').astype(np.float32)
+    test_label = np.load(location+'/test/val_label.npy').astype(np.float32)
+    return (train_data, train_label), (test_data, test_label)
     
 def define_network(num_inputs, num_outputs):
     net = nn.Sequential()
     with net.name_scope():
-        net.add(gluon.nn.Dense(num_outputs, in_units=num_input))
+        net.add(gluon.nn.Dense(64, activation='relu'))
+        net.add(gluon.nn.Dense(2))
     return net
 
 
@@ -115,11 +127,9 @@ def get_train_data(data,batch_size):
                                         shuffle=True, batch_size=batch_size)
 
 
-def get_val_data(data_dir,batch_size):
-    return gluon.data.DataLoader(
-        gluon.data.vision.MNIST(data_dir, train=False, transform=input_transformer),
-        batch_size=batch_size, shuffle=False)
-
+def get_test_data(data,batch_size):
+    return gluon.data.DataLoader(gluon.data.ArrayDataset(data[0], data[1]), 
+                                        shuffle=False, batch_size=batch_size)
   
 def evaluate_accuracy(net, data_iterator, ctx):
     metric = mx.metric.RMSE()

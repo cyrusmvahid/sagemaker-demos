@@ -101,6 +101,18 @@ def train(channel_input_dirs, hyperparameters, hosts, num_gpus, **kwargs):
 
 
 def save(net, model_dir):
+    print()
+    print()
+    print()
+    print()
+    print('**********************************************************************')
+    print('saving the model in {}'.format(model_dir))
+    print('**********************************************************************')
+    print()
+    print()
+    print()
+    print()
+
     # save the model
     y = net(mx.sym.var('data'))
     y.save('%s/model.json' % model_dir)

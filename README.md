@@ -32,3 +32,8 @@ SageMaker Python SDK is an open source library for training and deploying machin
 	![MXNet Model](docs/images/classes_mdl_mx.png)
 - **Predictor**: Provide real-time inference and transformation using Python data-types against a SageMaker Endpoint     
 ![Predictor](docs/images/classes_prd_base.png)
+
+- **Session:** Provides a collection of convience methods for working with SageMaker resources.    
+![Session](docs/images/classes_base_session.png)
+
+-

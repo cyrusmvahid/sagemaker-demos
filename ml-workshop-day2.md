@@ -367,5 +367,6 @@ net1 = dssm_recommender(256)
 mx.viz.plot_network(net1)
 ````
 
-> 
-https://www.oreilly.com/ideas/deep-matrix-factorization-using-apache-mxnet
+> **Deep matrix factorization using Apache MXNet** (A tutorial on how to use machine learning to build recommender systems.)
+>
+> https://www.oreilly.com/ideas/deep-matrix-factorization-using-apache-mxnet

@@ -51,7 +51,7 @@ def ensure_local_data(prefix):
     if not os.path.exists("%s.zip" % prefix):
         print("Downloading MovieLens data: %s" % prefix)
         os.system("wget http://files.grouplens.org/datasets/movielens/%s.zip" % prefix)
-        os.system("unzip %s.zip" % prefix)
+    os.system("unzip %s.zip" % prefix)
 
 
 def get_data_iter(batch_size, prefix='ml-100k'):

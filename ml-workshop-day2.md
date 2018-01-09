@@ -26,7 +26,7 @@ Amazon SageMaker Python SDK is an open source library for training and deploying
 
 ---
 
-## **Lab 1. Build your first Deep Learning Programme: Digit recognition**
+## **Lab 1. Build your first Deep Learning Programm: Digit recognition**
 
 ### 1-1. MNIST handwritten digit predection using MLP 
 
@@ -82,14 +82,71 @@ m = MXNet("mnist.py",
 m.fit(inputs)
 ```
 
+#### **TIP** How to run the training script within Jupyter notebook not in a seperate training environment?
+
+You can invoke _train_ function directly with the correct parameters.
+
+_train(channel_input_dget_train_datairs, hyperparameters, hosts, num_gpus, **kwargs)_
+
+
+````python
+import mnist as pyfile
+hyperparameters={'batch_size': 100, 
+                         'epochs': 10, 
+                         'learning_rate': 0.1, 
+                         'momentum': 0.9, 
+                         'log_interval': 100})
+
+pyfile.train({'training': 'data/train/'},
+    hyperparameters=hyper_parameters, 
+    hosts=['local'], num_gpus=0)
+````
+
+You need to define _save_ function in your training script to save the trained model. SageMaker will call _save_ function with the return value of _train_ function. See the below sample code. Once the training job completes, the model file is being sent to S3 bucket.
+
+```python
+def save(net, model_dir):
+    # save the model
+    y = net(mx.sym.var('data'))
+    y.save('%s/model.json' % model_dir)
+    net.collect_params().save('%s/model.params' % model_dir)
+
+```
+
+Then, the function to make a prediction needs to be defined within a function, _transform_fn_.
+
+````python
+def transform_fn(net, data, input_content_type, output_content_type):
+    """
+    Transform a request using the Gluon model. Called once per request.
+
+    :param net: The Gluon model.
+    :param data: The request payload.
+    :param input_content_type: The request content type.
+    :param output_content_type: The (desired) response content type.
+    :return: response payload and content type.
+    """
+    # we can use content types to vary input/output handling, but
+    # here we just assume json for both
+    parsed = json.loads(data)
+    nda = mx.nd.array(parsed)
+    output = net(nda)
+    prediction = mx.nd.argmax(output, axis=1)
+    response_body = json.dumps(prediction.asnumpy().tolist()[0])
+    return response_body, output_content_type
+
+````
+
 The prediction is also made through Amazon SageMaker Python SDK;
 ```python
 response = predictor.predict(data)
 ```
 
+> Refer to https://docs.aws.amazon.com/sagemaker/latest/dg/mxnet-training-inference-code-template.html for other functions to be defined in training scripts and inference scripts.
+
 #### Training Result 
 
-After 10 epoch, the accuracy of training data and validation data are given as 0.991183 and 0.973400 respectively. Your result will not be the same as this.
+After 10 epochs, the prediction accuracy on training data and validation data are given as 0.991183 and 0.973400 respectively. Your result will not be the same as this.
 
 ````
 [Epoch 9] Training: accuracy=0.991183
@@ -106,7 +163,7 @@ Modify the belows either jupyter notebook or python code and find the training p
 
 Also, add more Dense (or fully connected) layers and observe if you can get better models.
 
-
+> NOTE: Refer to Gluon API (Basic Layers) at https://mxnet.incubator.apache.org/api/python/gluon.html
 
 #### **Question**
 
@@ -132,6 +189,8 @@ With Fashion MNIST dataset, the MLP gives lower accuracy than the model for MNIS
 #### Challenge
 
 Add more Dense (or fully connected) layers and observe if you can get better accuracy.
+
+> NOTE: Refer to Gluon API (Basic Layers) at https://mxnet.incubator.apache.org/api/python/gluon.html
 
 ---
 ## **Lab 2. Build your first CNN**
@@ -195,7 +254,9 @@ Make any modification to increase the accuracy.
 - Adding more Convolutional Layers
 - Changing the optimizer (the code uses SGD)
 
-> Adam Optimizer on Gluon
+> NOTE: Refer to Gluon API (Convolutional Layers, Pooling Layers) at https://mxnet.incubator.apache.org/api/python/gluon.html
+
+> **Adam Optimizer on Gluon**
 > 
 > http://gluon.mxnet.io/chapter06_optimization/adam-gluon.html
 > 
@@ -210,15 +271,101 @@ Make any modification to increase the accuracy.
 
 ## **Lab 3. Build your first Recommender System**
 
-https://www.oreilly.com/ideas/deep-matrix-factorization-using-apache-mxnet
+In this lab, we define different matric factorization models using Apache MXNet, and train them using MovieLens 100k dataset.
+
+> **MovieLens 100K** (https://grouplens.org/datasets/movielens/100k/)
+>
+> Stable benchmark dataset. 100,000 ratings from 1000 users on 1700 movies. Released 4/1998.
 
 ### 3-1. Linear MF and Neural Network MF
 
-> Notebook: demo1-MF.ipynb
+> **Notebook:** recommenders/demo1-MF.ipynb
+>
+> **Python scripts:** recommenders/matrix_fact.py, recommenders/movielens_data.py
 
+````python
+def plain_net(k):
+    # input
+    user = mx.symbol.Variable('user')
+    item = mx.symbol.Variable('item')
+    score = mx.symbol.Variable('score')
+    # user feature lookup
+    user = mx.symbol.Embedding(data = user, input_dim = max_user, output_dim = k) 
+    # item feature lookup
+    item = mx.symbol.Embedding(data = item, input_dim = max_item, output_dim = k)
+    # predict by the inner product, which is elementwise product and then sum
+    pred = user * item
+    pred = mx.symbol.sum(data = pred, axis = 1)
+    pred = mx.symbol.Flatten(data = pred)
+    # loss layer
+    pred = mx.symbol.LinearRegressionOutput(data = pred, label = score)
+    return pred
+````
 
+````python
+model = mx.model.FeedForward(
+    ctx = ctx,
+    symbol = network,
+    num_epoch = num_epoch,
+    optimizer = optimizer,
+    learning_rate = learning_rate,
+    wd = 1e-4,
+    **opt_args
+)
 
+model.fit(X = train,
+            eval_data = test,
+            eval_metric = RMSE,
+            batch_end_callback = [mx.callback.Speedometer(50, 500), my_callback]
+            )
+````
+#### Challenge
 
-### 3-2.
+Migrate this notebook and scripts to a training script which can be used by Amazon SageMaker.
 
-### 3-3.
+> **Hint:** 
+>
+> Move _plain_net()_ and _get_one_layer_mlp()_ to matrix_fact.py, and modify _train()_ function in matrix_fact.py. Refer to the previous Lab for train() modification.
+
+### 3-2. Content-based recommender using DSSM
+
+> **Notebook:** recommenders/demo3-dssm.ipynb
+>
+> **Python scripts:** recommenders/symbol_alexnet.py, recommenders/recotools.py
+
+````python
+def dssm_recommender(k):
+    # input variables
+    title = mx.symbol.Variable('title_words')
+    image = mx.symbol.Variable('image')
+    queries = mx.symbol.Variable('query_ngrams')
+    user = mx.symbol.Variable('user_id')
+    label = mx.symbol.Variable('label')
+    
+    # Process content stack
+    image = alexnet.features(image, 256)
+    title = recotools.SparseBagOfWordProjection(data=title, vocab_size=title_vocab, output_dim=k)
+    title = mx.symbol.FullyConnected(data=title, num_hidden=k)
+    content = mx.symbol.Concat(image, title)
+    content = mx.symbol.Dropout(content, p=0.5)
+    content = mx.symbol.FullyConnected(data=content, num_hidden=k)
+    
+    # Process user stack
+    user = mx.symbol.Embedding(data=user, input_dim=max_user, output_dim=k) 
+    user = mx.symbol.FullyConnected(data=user, num_hidden=k)
+    queries = recotools.SparseBagOfWordProjection(data=queries, vocab_size=ngram_dimensions, output_dim=k)
+    queries = mx.symbol.FullyConnected(data=queries, num_hidden=k)
+    user = mx.symbol.Concat(user,queries)
+    user = mx.symbol.Dropout(user, p=0.5)
+    user = mx.symbol.FullyConnected(data=user, num_hidden=k)
+    
+    # loss layer
+    pred = recotools.CosineLoss(a=user, b=content, label=label)
+    return pred
+
+net1 = dssm_recommender(256)
+mx.viz.plot_network(net1)
+````
+
+> 
+https://www.oreilly.com/ideas/deep-matrix-factorization-using-apache-mxnet

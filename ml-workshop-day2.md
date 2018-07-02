@@ -28,7 +28,7 @@ Amazon SageMaker Python SDK is an open source library for training and deploying
 
 ## **Lab 1. Build your first Deep Learning Programm: Digit recognition**
 
-### 1-1. MNIST handwritten digit predection using MLP 
+### 1-1. MNIST handwritten digit predection using MLP
 
 > **Notebook** : mxnet_gluon_mlp/MNIST/mnist_with_gluon.ipynb
 >
@@ -70,14 +70,14 @@ The notebook code run the train code using Amazon SageMaker Python SDK;
 ```python
 inputs = sagemaker_session.upload_data(path='data', key_prefix='data/mnist')
 
-m = MXNet("mnist.py", 
-          role=role, 
-          train_instance_count=1, 
+m = MXNet("mnist.py",
+          role=role,
+          train_instance_count=1,
           train_instance_type="ml.c4.xlarge",
-          hyperparameters={'batch_size': 100, 
-                         'epochs': 10, 
-                         'learning_rate': 0.1, 
-                         'momentum': 0.9, 
+          hyperparameters={'batch_size': 100,
+                         'epochs': 10,
+                         'learning_rate': 0.1,
+                         'momentum': 0.9,
                          'log_interval': 100})
 m.fit(inputs)
 ```
@@ -91,16 +91,37 @@ _train(channel_input_dget_train_datairs, hyperparameters, hosts, num_gpus, **kwa
 
 ````python
 import mnist as pyfile
-hyperparameters={'batch_size': 100, 
-                         'epochs': 10, 
-                         'learning_rate': 0.1, 
-                         'momentum': 0.9, 
+hyperparameters={'batch_size': 100,
+                         'epochs': 10,
+                         'learning_rate': 0.1,
+                         'momentum': 0.9,
                          'log_interval': 100})
 
 pyfile.train({'training': 'data/train/'},
-    hyperparameters=hyper_parameters, 
+    hyperparameters=hyper_parameters,
     hosts=['local'], num_gpus=0)
 ````
+You can also use SageMaker local to run locally.
+
+install sagemaker local
+```python
+!~/sample-notebooks/sagemaker-python-sdk/mxnet_gluon_mnist/setup.sh
+```
+
+You can now run Sagemaker local using:
+
+```python
+m = MXNet("mnist.py",
+          role=role,
+          train_instance_count=1,
+          train_instance_type="local",
+          hyperparameters={'batch_size': 100,
+                         'epochs': 10,
+                         'learning_rate': 0.1,
+                         'momentum': 0.9,
+                         'log_interval': 100})
+m.fit(inputs)
+```
 
 You need to define _save_ function in your training script to save the trained model. SageMaker will call _save_ function with the return value of _train_ function. See the below sample code. Once the training job completes, the model file is being sent to S3 bucket.
 
@@ -144,7 +165,7 @@ response = predictor.predict(data)
 
 > Refer to https://docs.aws.amazon.com/sagemaker/latest/dg/mxnet-training-inference-code-template.html for other functions to be defined in training scripts and inference scripts.
 
-#### Training Result 
+#### Training Result
 
 After 10 epochs, the prediction accuracy on training data and validation data are given as 0.991183 and 0.973400 respectively. Your result will not be the same as this.
 
@@ -188,7 +209,8 @@ With Fashion MNIST dataset, the MLP gives lower accuracy than the model for MNIS
 
 #### Challenge
 
-Add more Dense (or fully connected) layers and observe if you can get better accuracy.
+Use SageMaker Hyperparameter tuning jobs to tune the job hyper parameters.
+https://github.com/aws/sagemaker-python-sdk 
 
 > NOTE: Refer to Gluon API (Basic Layers) at https://mxnet.incubator.apache.org/api/python/gluon.html
 
@@ -257,10 +279,10 @@ Make any modification to increase the accuracy.
 > NOTE: Refer to Gluon API (Convolutional Layers, Pooling Layers) at https://mxnet.incubator.apache.org/api/python/gluon.html
 
 > **Adam Optimizer on Gluon**
-> 
+>
 > http://gluon.mxnet.io/chapter06_optimization/adam-gluon.html
-> 
-> 
+>
+>
 > ````
 > [Epoch 9] Training: accuracy=0.904250
 > [Epoch 9] Validation: accuracy=0.886200
@@ -290,7 +312,7 @@ def plain_net(k):
     item = mx.symbol.Variable('item')
     score = mx.symbol.Variable('score')
     # user feature lookup
-    user = mx.symbol.Embedding(data = user, input_dim = max_user, output_dim = k) 
+    user = mx.symbol.Embedding(data = user, input_dim = max_user, output_dim = k)
     # item feature lookup
     item = mx.symbol.Embedding(data = item, input_dim = max_item, output_dim = k)
     # predict by the inner product, which is elementwise product and then sum
@@ -323,7 +345,7 @@ model.fit(X = train,
 
 Migrate this notebook and scripts to a training script which can be used by Amazon SageMaker.
 
-> **Hint:** 
+> **Hint:**
 >
 > Move _plain_net()_ and _get_one_layer_mlp()_ to matrix_fact.py, and modify _train()_ function in matrix_fact.py. Refer to the previous Lab for train() modification.
 
@@ -341,7 +363,7 @@ def dssm_recommender(k):
     queries = mx.symbol.Variable('query_ngrams')
     user = mx.symbol.Variable('user_id')
     label = mx.symbol.Variable('label')
-    
+
     # Process content stack
     image = alexnet.features(image, 256)
     title = recotools.SparseBagOfWordProjection(data=title, vocab_size=title_vocab, output_dim=k)
@@ -349,16 +371,16 @@ def dssm_recommender(k):
     content = mx.symbol.Concat(image, title)
     content = mx.symbol.Dropout(content, p=0.5)
     content = mx.symbol.FullyConnected(data=content, num_hidden=k)
-    
+
     # Process user stack
-    user = mx.symbol.Embedding(data=user, input_dim=max_user, output_dim=k) 
+    user = mx.symbol.Embedding(data=user, input_dim=max_user, output_dim=k)
     user = mx.symbol.FullyConnected(data=user, num_hidden=k)
     queries = recotools.SparseBagOfWordProjection(data=queries, vocab_size=ngram_dimensions, output_dim=k)
     queries = mx.symbol.FullyConnected(data=queries, num_hidden=k)
     user = mx.symbol.Concat(user,queries)
     user = mx.symbol.Dropout(user, p=0.5)
     user = mx.symbol.FullyConnected(data=user, num_hidden=k)
-    
+
     # loss layer
     pred = recotools.CosineLoss(a=user, b=content, label=label)
     return pred
